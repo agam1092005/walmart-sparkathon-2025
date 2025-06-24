@@ -1,15 +1,23 @@
-from db import mongo
+import requests
 
-def add_user(org_name, email, hashed_password):
-    mongo.db.users.insert_one({'org_name': org_name, 'email': email, 'password': hashed_password})
+POCKETBASE_URL = 'http://127.0.0.1:8090'
+USERS_COLLECTION = 'users'
 
+def signup_user(org_name, email, password):
+    data = {
+        'org_name': org_name,
+        'email': email,
+        'password': password,
+        'passwordConfirm': password
+    }
+    resp = requests.post(f"{POCKETBASE_URL}/api/collections/{USERS_COLLECTION}/records", json=data)
+    print("PocketBase response:", resp.status_code, resp.text) 
+    return resp.json() if resp.status_code == 200 else None
 
-def update_password(email, new_hashed_password):
-    user = mongo.db.users.find_one({'email': email})
-    if user:
-        user['password'] = new_hashed_password
-        mongo.db.users.save(user)
-
-
-def get_user(email):
-    return mongo.db.users.find_one({'email': email})
+def login_user(email, password):
+    data = {
+        'identity': email,
+        'password': password
+    }
+    resp = requests.post(f"{POCKETBASE_URL}/api/collections/{USERS_COLLECTION}/auth-with-password", json=data)
+    return resp.json() if resp.status_code == 200 else None
