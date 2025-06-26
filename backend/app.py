@@ -4,6 +4,7 @@ from flask_cors import CORS
 from config import Config
 from auth import create_auth_blueprint
 from data_breach import create_data_breach_blueprint
+from ml import create_ml_blueprint
 
 app = Flask(__name__)
 app.config.from_object(Config)
@@ -12,6 +13,7 @@ jwt_manager = JWTManager(app)
 
 app.register_blueprint(create_auth_blueprint(), url_prefix='/v1/auth')
 app.register_blueprint(create_data_breach_blueprint(), url_prefix='/v1/data_breach')
+app.register_blueprint(create_ml_blueprint(), url_prefix='/v1/ml')
 
 @app.route('/v1/health', methods=['GET'])
 def versionInfo():

@@ -1,5 +1,6 @@
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, make_response
 from .models import signup_user, login_user
+from flask_jwt_extended import create_access_token
 
 auth_bp = Blueprint('auth_bp', __name__)
 
@@ -30,8 +31,19 @@ def signin():
     if not auth_result:
         return jsonify({"msg": "Invalid email or password"}), 401
 
-    return jsonify({
+    token = auth_result.get('token')
+    user = auth_result.get('record')
+    resp = make_response(jsonify({
         "msg": "Login successful",
-        "token": auth_result.get('token'),
-        "user": auth_result.get('record')
-    }), 200
+        "token": token,
+        "user": user
+    }), 200)
+    # Set the token as a cookie (HttpOnly, Secure)
+    resp.set_cookie('pb_token', token, httponly=True, secure=True, samesite='Lax')
+    return resp
+
+@auth_bp.route('/logout', methods=['POST'])
+def logout():
+    resp = make_response(jsonify({"msg": "Logged out"}))
+    resp.set_cookie('pb_token', '', expires=0)
+    return resp
