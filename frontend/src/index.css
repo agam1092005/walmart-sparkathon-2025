@@ -71,6 +71,7 @@ form {
 
 input[type="text"],
 input[type="password"],
+input[type="email"],
 input[type="file"] {
   padding: 14px 16px;
   border-radius: 10px;

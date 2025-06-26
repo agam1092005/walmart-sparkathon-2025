@@ -29,7 +29,7 @@ def create_preprocessor(X):
 
     categorical_pipeline = Pipeline([
         ('imputer', SimpleImputer(strategy='constant', fill_value='missing')),
-        ('onehot', OneHotEncoder(drop='first', handle_unknown='ignore'))
+        ('onehot', OneHotEncoder(drop=None,handle_unknown='ignore',categories='auto'))
     ])
 
     preprocessor = ColumnTransformer(transformers=[

@@ -4,17 +4,24 @@ import axios from 'axios';
 
 function UploadPage() {
   const [file, setFile] = useState(null);
+  const [message, setMessage] = useState('');
   const navigate = useNavigate();
 
   const handleUpload = async (e) => {
     e.preventDefault();
+    setMessage('');
     const formData = new FormData();
     formData.append('dataset', file);
     try {
-      await axios.post('http://localhost:5000/upload', formData);
-      navigate('/result');
+      await axios.post(
+        'http://localhost:5555/v1/ml/upload',
+        formData,
+        { withCredentials: true }
+      );
+      setMessage('✅ Upload successful! Training started.');
+      setTimeout(() => navigate('/result'), 1500);
     } catch (error) {
-      console.error('Upload failed:', error);
+      setMessage('❌ Upload failed.');
     }
   };
 
@@ -25,11 +32,12 @@ function UploadPage() {
         <input
           type="file"
           accept=".csv"
-          onChange={(e) => setFile(e.target.files[0])}
+          onChange={e => setFile(e.target.files[0])}
           required
         />
         <button type="submit">Submit Dataset</button>
       </form>
+      {message && <p className="message">{message}</p>}
     </div>
   );
 }

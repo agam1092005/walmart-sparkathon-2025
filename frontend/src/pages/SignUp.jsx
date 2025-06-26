@@ -1,16 +1,27 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import axios from 'axios';
 
 function SignUpPage() {
-  const [newUser, setNewUser] = useState('');
-  const [newPass, setNewPass] = useState('');
+  const [orgName, setOrgName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [message, setMessage] = useState('');
   const navigate = useNavigate();
 
-  const handleSignUp = (e) => {
+  const handleSignUp = async (e) => {
     e.preventDefault();
-    if (newUser && newPass) {
-      localStorage.setItem('user', newUser);
-      navigate('/');
+    setMessage('');
+    try {
+      await axios.post('http://localhost:5555/v1/auth/signup', {
+        org_name: orgName,
+        email,
+        password,
+      });
+      setMessage('✅ Registration successful! Redirecting to login...');
+      setTimeout(() => navigate('/'), 1500);
+    } catch (err) {
+      setMessage('❌ Registration failed.');
     }
   };
 
@@ -20,20 +31,28 @@ function SignUpPage() {
       <form onSubmit={handleSignUp}>
         <input
           type="text"
-          placeholder="New Username"
-          value={newUser}
-          onChange={(e) => setNewUser(e.target.value)}
+          placeholder="Organization Name"
+          value={orgName}
+          onChange={e => setOrgName(e.target.value)}
+          required
+        />
+        <input
+          type="email"
+          placeholder="Email"
+          value={email}
+          onChange={e => setEmail(e.target.value)}
           required
         />
         <input
           type="password"
-          placeholder="New Password"
-          value={newPass}
-          onChange={(e) => setNewPass(e.target.value)}
+          placeholder="Password"
+          value={password}
+          onChange={e => setPassword(e.target.value)}
           required
         />
         <button type="submit">Register</button>
       </form>
+      {message && <p className="message">{message}</p>}
     </div>
   );
 }
