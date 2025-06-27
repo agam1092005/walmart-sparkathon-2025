@@ -3,6 +3,9 @@ from werkzeug.utils import secure_filename
 import subprocess
 import sys
 import os
+import time
+import tempfile
+import pandas as pd
 
 POCKETBASE_URL = 'http://127.0.0.1:8090'
 DATA_COLLECTION = 'data'
@@ -21,6 +24,20 @@ def upload_to_pocketbase(company, file, token=None):
     if not allowed_file(file.filename):
         return False, {'error': 'Only CSV files are allowed'}, 400
 
+    # Preprocess CSV: drop NA in label, convert label to int
+    try:
+        df = pd.read_csv(file)
+        if 'label_is_fraud' not in df.columns:
+            return False, {'error': 'Missing label column: label_is_fraud'}, 400
+        df = df.dropna(subset=['label_is_fraud'])
+        df['label_is_fraud'] = df['label_is_fraud'].astype(int)
+    except Exception as e:
+        return False, {'error': f'Failed to read/clean CSV: {str(e)}'}, 400
+    with tempfile.NamedTemporaryFile(delete=False, suffix='.txt', mode='w', newline='') as tmp_txt:
+        df.to_csv(tmp_txt, index=False)
+        txt_path = tmp_txt.name
+    txt_filename = secure_filename(os.path.splitext(file.filename)[0] + '.txt')
+
     data = {
         'company': company,
         'submitted': 'true',
@@ -28,7 +45,7 @@ def upload_to_pocketbase(company, file, token=None):
         'encrypted': 'false'
     }
     files = {
-        'dataset': (secure_filename(file.filename), file.stream, file.mimetype)
+        'dataset': (txt_filename, open(txt_path, 'rb'), 'text/plain')
     }
     headers = {'Authorization': f'Bearer {token}'}
     resp = requests.post(
@@ -37,16 +54,16 @@ def upload_to_pocketbase(company, file, token=None):
         files=files,
         headers=headers
     )
+    os.remove(txt_path)
     if resp.status_code == 400 and 'already exists' in resp.text:
         return False, {'error': 'Company already exists'}, 409
     if not resp.ok:
         return False, {'error': 'PocketBase error', 'details': resp.text}, 500
     return True, {'success': True, 'record': resp.json()}, 200
 
-def start_background_training(company):
+def start_background_training(company, pb_token):
     script_path = os.path.join(os.path.dirname(__file__), 'client_runner.py')
-    # Use sys.executable for python path
-    subprocess.Popen([sys.executable, script_path, company])
+    subprocess.Popen([sys.executable, script_path, company, pb_token])
 
 def get_company_status(company):
     url = f"{POCKETBASE_URL}/api/collections/{DATA_COLLECTION}/records?filter=company='{company}'"

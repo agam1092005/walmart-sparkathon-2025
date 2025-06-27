@@ -24,13 +24,21 @@ def upload_csv():
     file = request.files['dataset']
     success, result, status = upload_to_pocketbase(org_name, file, token)
     if success:
-        start_background_training(org_name)
+        start_background_training(org_name, token)
         print(f"[INFO] Started training subprocess for {org_name}")
     return jsonify(result), status
 
 @ml_bp.route('/api/train/<company>', methods=['POST'])
 def train_company(company):
-    start_background_training(company)
+    # For manual trigger, require token in header or cookie
+    token = request.cookies.get('pb_token')
+    if not token:
+        auth_header = request.headers.get('Authorization', '')
+        if auth_header.startswith('Bearer '):
+            token = auth_header.split(' ', 1)[1]
+    if not token:
+        return jsonify({'error': 'Authentication required'}), 401
+    start_background_training(company, token)
     return jsonify({
         "status": "started",
         "message": f"Training for {company} is running in background."
