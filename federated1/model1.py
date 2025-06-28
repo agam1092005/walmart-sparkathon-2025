@@ -17,6 +17,7 @@ from tensorflow_privacy.privacy.optimizers.dp_optimizer_keras import DPKerasAdam
 # ------------------ Load Data ------------------
 def load_data(file_path):
     data = pd.read_csv(file_path)
+    data = data.dropna(subset=['label_is_fraud'])
     X = data.drop('label_is_fraud', axis=1)
     y = data['label_is_fraud']
     return X, y
