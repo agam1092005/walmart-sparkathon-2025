@@ -6,16 +6,14 @@ import os
 import requests
 import io
 import time
-from client_helper import create_preprocessor, build_model
+from datetime import datetime
 from sklearn.model_selection import train_test_split
 from sklearn.utils import class_weight
-from datetime import datetime
+from client_helper import create_preprocessor, build_model
 
-# ⛳ Config
-DATA_DIR = "../datasets"
-MODEL_DIR = "../models"
+
 POCKETBASE_URL = "http://127.0.0.1:8090"
-COLLECTION = "data"  # Use DATA collection
+COLLECTION = "data"
 
 
 def get_dataset_url(company, pb_token, max_retries=5, delay=2):
@@ -33,29 +31,22 @@ def get_dataset_url(company, pb_token, max_retries=5, delay=2):
             filename = record["dataset"]
             dataset_url = f"{POCKETBASE_URL}/api/files/{collection_id}/{record_id}/{filename}"
             return dataset_url
-        print(f"[WARN] Dataset not found for company '{company}', retrying ({attempt+1}/{max_retries})...")
+        print(f"[WARN] Dataset not found for '{company}', retrying ({attempt+1}/{max_retries})...")
         time.sleep(delay)
-    # Print all items for inspection if not found
-    print(f"[ERROR] No matching dataset found after {max_retries} retries. Last response items: {items}")
-    raise Exception("Dataset not found for company after several retries")
+    raise Exception("Dataset not found after several retries")
+
 
 def update_pocketbase_status(company, model_path, pb_token):
-    # Fetch record ID
     headers = {"Authorization": f"Bearer {pb_token}"}
     res = requests.get(f"{POCKETBASE_URL}/api/collections/{COLLECTION}/records?filter=company='{company}'", headers=headers)
     items = res.json().get("items", [])
     if not items:
-        print(f"[❌] No PocketBase record found for {company}")
+        print(f"No PocketBase record found for {company}")
         return
-    record_id = items[0]["id"]
 
-    # Prepare form-data for PATCH
-    data = {
-        "hasTrained": "true"
-    }
-    files = {
-        "model": open(model_path, "rb")
-    }
+    record_id = items[0]["id"]
+    data = {"hasTrained": "true"}
+    files = {"model": open(model_path, "rb")}
     res = requests.patch(
         f"{POCKETBASE_URL}/api/collections/{COLLECTION}/records/{record_id}",
         data=data,
@@ -63,63 +54,56 @@ def update_pocketbase_status(company, model_path, pb_token):
         headers=headers
     )
     if res.ok:
-        print(f"[✅] PocketBase updated: hasTrained=True and model uploaded for {company}")
+        print(f"PocketBase updated: hasTrained=True and model uploaded for {company}")
     else:
-        print(f"[⚠️] Failed to update PocketBase for {company}: {res.text}")
+        print(f"Failed to update PocketBase for {company}: {res.text}")
+
+    try:
+        os.remove(model_path)
+        print(f"Model file cleaned up: {model_path}")
+    except Exception as e:
+        print(f"Failed to clean up model file: {e}")
+
 
 def run_local_training(company, pb_token):
-    # Download dataset from PocketBase
     dataset_url = get_dataset_url(company, pb_token)
     print(f"[📁] Downloading dataset from: {dataset_url}")
     resp = requests.get(dataset_url)
     resp.raise_for_status()
     df = pd.read_csv(io.BytesIO(resp.content))
 
-    # Drop rows with missing labels and ensure labels are integers
     df = df.dropna(subset=['label_is_fraud'])
     df['label_is_fraud'] = df['label_is_fraud'].astype(int)
 
-    # Separate features and labels
     X = df.drop('label_is_fraud', axis=1)
     y = df['label_is_fraud']
 
-    model_path = os.path.join(MODEL_DIR, f"local_{company}.pkl")
-
-    # Split data
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
-    # Preprocessing
     preprocessor = create_preprocessor(X_train)
     X_train = preprocessor.fit_transform(X_train).astype(np.float32)
     X_test = preprocessor.transform(X_test).astype(np.float32)
 
-    # Handle class imbalance
-    present_classes = np.unique(y_train)
-    class_weights = class_weight.compute_class_weight(
-        class_weight='balanced',
-        classes=present_classes,
-        y=y_train
-    )
-    weight_dict = dict(enumerate(class_weights))
+    try:
+        present_classes = np.unique(y_train)
+        class_weights = class_weight.compute_class_weight(class_weight='balanced', classes=present_classes, y=y_train)
+        weight_dict = dict(enumerate(class_weights))
+    except Exception as e:
+        print(f"Class weight computation failed: {e}")
+        weight_dict = None
 
-    # Manual validation split for DP safety
     X_train_final, X_val, y_train_final, y_val = train_test_split(X_train, y_train, test_size=0.2, random_state=42)
 
-    # Build model with DP-compatible microbatches
     input_shape = X_train.shape[1]
     batch_size = 32
     num_microbatches = 32
-    assert batch_size % num_microbatches == 0, "Batch size must be divisible by microbatches"
-
     model = build_model(input_shape, num_microbatches=num_microbatches)
 
     remainder = len(X_train_final) % batch_size
     if remainder != 0:
-        drop_count = remainder
-        print(f"[⚠️] Trimming {drop_count} samples to fit batch size requirements...")
-        X_train_final = X_train_final[:-drop_count]
-        y_train_final = y_train_final[:-drop_count]
-    # Train
+        X_train_final = X_train_final[:-remainder]
+        y_train_final = y_train_final[:-remainder]
+
     print(f"[🧠] Training model for {company}...")
     model.fit(
         X_train_final,
@@ -130,17 +114,19 @@ def run_local_training(company, pb_token):
         class_weight=weight_dict
     )
 
-    # Save model and preprocessor
+    MODEL_DIR = "../models"
     os.makedirs(MODEL_DIR, exist_ok=True)
+    timestamp = datetime.utcnow().strftime("%Y%m%d%H%M%S")
+    model_filename = f"local_{company}_{timestamp}.pkl"
+    model_path = os.path.join(MODEL_DIR, model_filename)
     joblib.dump((model, preprocessor), model_path)
     print(f"[💾] Model saved to: {model_path}")
 
-    # Upload model to PocketBase
     update_pocketbase_status(company, model_path, pb_token)
 
 
 if __name__ == "__main__":
     if len(sys.argv) < 3:
-        print("❌ Usage: python client_runner.py <company> <pb_token>")
+        print("Usage: python client_runner.py <company> <pb_token>")
     else:
         run_local_training(sys.argv[1], sys.argv[2])
