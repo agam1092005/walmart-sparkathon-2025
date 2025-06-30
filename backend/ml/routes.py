@@ -1,11 +1,13 @@
 from flask import Blueprint, request, jsonify
 from .models import upload_to_pocketbase, start_background_training, get_company_status, get_user_org_name_from_token
+import datetime
+import os
 
 ml_bp = Blueprint('ml_bp', __name__)
+POCKETBASE_URL = "http://127.0.0.1:8090"
 
 @ml_bp.route('/upload', methods=['POST'])
 def upload_csv():
-    # Try to get token from cookie or Authorization header
     token = request.cookies.get('pb_token')
     if not token:
         auth_header = request.headers.get('Authorization', '')
@@ -30,7 +32,6 @@ def upload_csv():
 
 @ml_bp.route('/api/train/<company>', methods=['POST'])
 def train_company(company):
-    # For manual trigger, require token in header or cookie
     token = request.cookies.get('pb_token')
     if not token:
         auth_header = request.headers.get('Authorization', '')
@@ -50,4 +51,3 @@ def status_company(company):
     if error:
         return jsonify(error), status
     return jsonify(result), 200
-

@@ -1,41 +1,42 @@
-# 🔐 Quantum-Secure Federated Fraud Detection for Retail  
-*A privacy-preserving, real-time fraud detection platform for retailers — powered by federated learning and quantum-resistant encryption.*
+# 🔐 Secure Federated Fraud Detection for Retail  
+*A privacy-preserving, real-time fraud detection platform for retailers — powered by federated learning and encrypted model sharing.*
 
 ---
 
 ## 🧠 Overview
 
-In the age of digital commerce, retailers are under constant threat from fraud, bots, and identity theft. Traditional centralized fraud detection systems require sharing sensitive data, risking compliance violations and customer trust.
+Retailers face constant threats from fraud, bot attacks, and identity misuse. But traditional fraud detection methods require centralized data sharing, which introduces risks of data leaks and compliance violations.
 
-This project introduces a **federated, privacy-first approach** that allows retailers to collaboratively detect fraud **without sharing customer data** — and it’s protected by **quantum-safe encryption** for long-term security.
+This project introduces a **federated, privacy-first approach** that allows retailers to collaboratively detect fraud **without sharing customer data** — using encrypted model updates and a lightweight coordination backend.
 
 ---
 
 ## 💡 Core Concept
 
-We combine two cutting-edge technologies:
+We combine two key technologies:
 
-1. **Federated Learning** – Enables multiple retailers to train a shared AI fraud detection model **without sharing raw data**.
-2. **Post-Quantum Encryption** – Secures all model updates using encryption that’s resistant to future quantum computer attacks.
+1. **Federated Learning** – Allows multiple retailers to train a shared AI fraud detection model **without exchanging raw data**.
+2. **Encrypted Model Transfer** – All model updates are encrypted before leaving a client, ensuring data minimization and secure collaboration.
 
-Together, they create a powerful, privacy-preserving, and future-ready fraud prevention system.
+Together, this creates a robust, privacy-respecting and scalable fraud detection framework.
 
 ---
 
 ## 🔧 How It Works
 
 ### 🔁 Global Model = **Base Knowledge**
-- Hosted centrally.
-- Built by securely aggregating encrypted model updates from all participating retailers.
-- Contains **no raw data** — only learnings distilled from local models.
+- Aggregated on the backend.
+- Built by combining encrypted model updates from all participating clients.
+- Stored in a lightweight backend database (PocketBase).
+- **No raw transactional data is ever collected centrally.**
 
-### 🧠 Local Model = **Base Knowledge + Real-Time Experience**
-- Deployed within each retailer's infrastructure.
-- Initializes with the latest **global model weights**.
+### 🧠 Local Model = **Base Knowledge + Real-Time Intelligence**
+- Runs inside each retailer’s secure infrastructure.
+- Starts from the latest global model snapshot.
 - Continuously:
   - Trains on local real-time transaction data.
-  - Detects fraud live (coupon abuse, payment anomalies, bot-like activity).
-  - Sends encrypted model updates (weights/gradients) back to the central aggregator.
+  - Detects fraud live (e.g., coupon abuse, payment anomalies, bot-like behavior).
+  - Sends encrypted model updates (weights or gradients) to the central backend for aggregation.
 
 ---
 
@@ -43,25 +44,28 @@ Together, they create a powerful, privacy-preserving, and future-ready fraud pre
 
 ### ✅ Real-Time Fraud Detection
 - Local models continuously score incoming transactions.
-- Flags high-risk activity instantly using pre-trained AI models.
-- Can block, hold, or require extra verification on the spot.
+- Flags high-risk activity instantly using locally trained AI models.
+- Supports real-time decisioning (block, hold, escalate).
 
 ### ✅ Privacy by Design
-- **No raw data ever leaves** the retailer's system.
-- Only model updates (not user logs) are shared.
-- Updates are encrypted before transmission using **CRYSTALS-Kyber** or similar post-quantum methods.
+- **No raw data ever leaves** a client’s infrastructure.
+- Only encrypted model updates are transmitted.
+- Local training happens entirely offline.
 
 ### ✅ Federated Intelligence
-- Each retailer benefits from **global fraud detection knowledge**, contributed by others in the network.
-- Faster detection of new attack patterns across regions and sectors.
+- Clients benefit from **shared learnings** contributed by others in the network.
+- Enables faster adaptation to new fraud trends across industries.
 
-### ✅ Quantum-Resistant Encryption
-- All model updates are secured using **lattice-based cryptography** (Kyber, Dilithium).
-- Future-proof against threats from quantum computing.
+### ✅ Encrypted Model Exchange
+- All updates (weights) are encrypted before upload.
+- Models are stored securely and updated incrementally.
+- No individual client’s private model is ever exposed.
 
-### ✅ Continuous Model Sync
-- Retailers receive regular updates of the improved global model.
-- Local models combine it with fresh, real-time local data — ensuring relevance and adaptability.
+### ✅ Lightweight Coordination
+- Uses **PocketBase** (embedded Go-based backend) to:
+  - Track uploads
+  - Distribute global model updates
+  - Maintain metadata (clients, training status, timestamps)
 
 ---
 
@@ -71,37 +75,31 @@ Together, they create a powerful, privacy-preserving, and future-ready fraud pre
 |------------------------|-------------------------------------------|
 | Frontend Dashboard     | React.js                                  |
 | Backend API            | Flask                                     |
-| Local Model Training   | PyTorch / TensorFlow                      |
-| Federated Learning     | Flower / TensorFlow Federated / PySyft    |
-| Encryption             | Open Quantum Safe (Kyber, Dilithium)      |
+| Local Model Training   | TensorFlow + Differential Privacy         |
+| Federated Learning     | Flower (Python)                           |
+| Model Encryption       | Fernet (AES-based)                        |
+| Storage / Metadata     | PocketBase                                |
 
 ---
 
 ## 📊 Example Use Case: Flipkart + Walmart
 
-- Flipkart connects their MongoDB; Walmart connects MySQL.
-- Both see real-time transactions scored and flagged by their local models.
-- Local training happens automatically as new behavior is observed.
-- Periodically, encrypted updates are sent to the aggregator.
-- Global model is updated and pushed back to all participants.
-- Result: Faster, smarter fraud detection across both ecosystems — **with zero compromise on data privacy.**
+- Flipkart connects their transaction data stream.
+- Walmart connects theirs separately.
+- Both run real-time local models, detecting fraud before checkout.
+- Local model updates are encrypted and sent to the backend.
+- Backend updates the global model and syncs it to all clients.
+- Result: smarter fraud detection for both — with **no privacy compromise**.
 
 ---
 
 ## 🛡️ Why This Matters
 
-> This project proves that retailers can work together to fight fraud — without giving up control of their data.
+> This system proves that multiple organizations can collaborate securely — without giving up control of their data.
 
 It’s:
 - 🔐 Privacy-first  
 - 🧠 AI-driven  
 - 🔄 Collaborative  
-- 🧬 Quantum-secure  
-- 🚀 Real-time ready
-
----
-
-## 📄 License
-
-MIT License – feel free to fork, contribute, and build on this idea.
-
+- 🚀 Real-time ready  
+- ☁️ Lightweight and deployable anywhere
