@@ -1,7 +1,5 @@
 from flask import Blueprint, request, jsonify
 from .models import upload_to_pocketbase, start_background_training, get_company_status, get_user_org_name_from_token
-import datetime
-import os
 
 ml_bp = Blueprint('ml_bp', __name__)
 POCKETBASE_URL = "http://127.0.0.1:8090"
@@ -16,7 +14,6 @@ def upload_csv():
     if not token:
         return jsonify({'error': 'Authentication required'}), 401
 
-    # Get org_name from user info
     org_name = get_user_org_name_from_token(token)
     if not org_name:
         return jsonify({'error': 'Could not determine company/org_name from user info'}), 400

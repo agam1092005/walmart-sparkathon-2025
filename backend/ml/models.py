@@ -3,7 +3,6 @@ from werkzeug.utils import secure_filename
 import subprocess
 import sys
 import os
-import time
 import tempfile
 import pandas as pd
 
@@ -24,7 +23,6 @@ def upload_to_pocketbase(company, file, token=None):
     if not allowed_file(file.filename):
         return False, {'error': 'Only CSV files are allowed'}, 400
 
-    # Preprocess CSV: drop NA in label, convert label to int
     try:
         df = pd.read_csv(file)
         if 'label_is_fraud' not in df.columns:
@@ -82,9 +80,7 @@ def get_company_status(company):
     }
     if 'modelPath' in record:
         result['modelPath'] = record['modelPath']
-    # If dataset file is present, add its URL
     if 'dataset' in record and record['dataset']:
-        # PocketBase file URL: /api/files/<collectionId>/<recordId>/<filename>
         collection_id = record.get('collectionId', DATA_COLLECTION)
         record_id = record.get('id')
         filename = record['dataset']

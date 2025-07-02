@@ -10,8 +10,6 @@ from datetime import datetime
 from sklearn.model_selection import train_test_split
 from sklearn.utils import class_weight
 from client_helper import create_preprocessor, build_model
-import pickle
-from encryption import generate_symmetric_key, encrypt_bytes
 
 POCKETBASE_URL = "http://127.0.0.1:8090"
 
@@ -36,7 +34,7 @@ def get_dataset_url(company, pb_token, max_retries=5, delay=2):
     raise Exception("Dataset not found after several retries")
 
 
-def update_pocketbase_status(company, model_path, pb_token):
+def update_pocketbase_status(company, model_path, preproc_path, pb_token):
     headers = {"Authorization": f"Bearer {pb_token}"}
     res = requests.get(f"{POCKETBASE_URL}/api/collections/data/records?filter=company='{company}'", headers=headers)
     items = res.json().get("items", [])
@@ -46,7 +44,10 @@ def update_pocketbase_status(company, model_path, pb_token):
 
     record_id = items[0]["id"]
     data = {"hasTrained": "true"}
-    files = {"model": open(model_path, "rb")}
+    files = {
+        "model": open(model_path, "rb"),
+        "preprocessor": open(preproc_path, "rb")
+    }
     res = requests.patch(
         f"{POCKETBASE_URL}/api/collections/data/records/{record_id}",
         data=data,
@@ -54,7 +55,7 @@ def update_pocketbase_status(company, model_path, pb_token):
         headers=headers
     )
     if res.ok:
-        print(f"PocketBase updated: hasTrained=True and model uploaded for {company}")
+        print(f"PocketBase updated: hasTrained=True, model and preprocessor uploaded for {company}")
     else:
         print(f"Failed to update PocketBase for {company}: {res.text}")
 
@@ -63,78 +64,40 @@ def update_pocketbase_status(company, model_path, pb_token):
         print(f"Model file cleaned up: {model_path}")
     except Exception as e:
         print(f"Failed to clean up model file: {e}")
+    try:
+        os.remove(preproc_path)
+        print(f"Preprocessor file cleaned up: {preproc_path}")
+    except Exception as e:
+        print(f"Failed to clean up preprocessor file: {e}")
 
 
 def push_to_global_model(company, model, pb_token):
-    print(f"Preparing weights for global model contribution...")
+    import subprocess
+    import threading
+    import time
 
-    weights = model.get_weights()
-    serialized = pickle.dumps(weights)
+    print(f"Initiating federated contribution to global model...")
 
-    shared_key = generate_symmetric_key()
-    encrypted_payload = encrypt_bytes(serialized, shared_key)
+    def run_server():
+        subprocess.run(["python3", "ml/flower_server.py", pb_token])
 
-    print(f"Contributing to global model via PocketBase API...")
+    server_thread = threading.Thread(target=run_server, daemon=True)
+    server_thread.start()
 
-    timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
-    temp_file_path = f"temp_weights_{company}_{timestamp}.bin"
+    time.sleep(5)
 
-    try:
-        with open(temp_file_path, "wb") as f:
-            f.write(encrypted_payload.encode() if isinstance(encrypted_payload, str) else encrypted_payload)
+    MODEL_DIR = "../models"
+    os.makedirs(MODEL_DIR, exist_ok=True)
+    latest_model_path = os.path.join(MODEL_DIR, f"local_{company}.pkl")
+    joblib.dump(model, latest_model_path)
 
-        headers = {"Authorization": f"Bearer {pb_token}"}
-        res = requests.get(f"{POCKETBASE_URL}/api/collections/global/records", headers=headers)
+    result = subprocess.run(["python3", "ml/flower_client.py", company, pb_token])
+    if result.returncode != 0:
+        print("Client failed to contribute")
+        return
 
-        if res.ok:
-            records = res.json().get("items", [])
-            if records:
-                global_id = records[0]["id"]
-                current_clients = set(records[0].get("clients", "").split(",")) if records[0].get("clients") else set()
-                current_clients.add(company)
+    print(f"Federated round complete. Everything is done.")
 
-                with open(temp_file_path, "rb") as f:
-                    files = {"global_model": f}
-                    data = {"clients": ",".join(current_clients)}
-
-                    update_res = requests.patch(
-                        f"{POCKETBASE_URL}/api/collections/global/records/{global_id}",
-                        data=data,
-                        files=files,
-                        headers=headers
-                    )
-
-                    if update_res.ok:
-                        print(f"Updated global model record with contribution from {company}")
-                    else:
-                        print(f"Failed to update global model: {update_res.text}")
-            else:
-                with open(temp_file_path, "rb") as f:
-                    files = {"global_model": f}
-                    data = {"clients": company}
-
-                    create_res = requests.post(
-                        f"{POCKETBASE_URL}/api/collections/global/records",
-                        data=data,
-                        files=files,
-                        headers=headers
-                    )
-
-                    if create_res.ok:
-                        print(f"Created new global model record with contribution from {company}")
-                    else:
-                        print(f"Failed to create global model record: {create_res.text}")
-        else:
-            print(f"Failed to check global model records: {res.text}")
-
-    except Exception as e:
-        print(f"Error contributing to global model: {e}")
-    finally:
-        try:
-            os.remove(temp_file_path)
-            print(f"Temporary weights file cleaned up: {temp_file_path}")
-        except Exception as e:
-            print(f"Failed to clean up temporary file: {e}")
 
 
 def run_local_training(company, pb_token):
@@ -188,13 +151,18 @@ def run_local_training(company, pb_token):
 
     MODEL_DIR = "../models"
     os.makedirs(MODEL_DIR, exist_ok=True)
-    timestamp = datetime.utcnow().strftime("%Y%m%d%H%M%S")
-    model_filename = f"local_{company}_{timestamp}.pkl"
-    model_path = os.path.join(MODEL_DIR, model_filename)
-    joblib.dump((model, preprocessor), model_path)
-    print(f"Model saved to: {model_path}")
 
-    update_pocketbase_status(company, model_path, pb_token)
+    weight_path = os.path.join(MODEL_DIR, f"weights_{company}.h5")
+    model.save_weights(weight_path)
+
+    preproc_path = os.path.join(MODEL_DIR, f"preprocessor_{company}.pkl")
+    joblib.dump(preprocessor, preproc_path)
+
+    print(f"Weights saved to: {weight_path}")
+    print(f"Preprocessor saved to: {preproc_path}")
+
+    update_pocketbase_status(company, weight_path, preproc_path, pb_token)
+
     push_to_global_model(company, model, pb_token)
 
 
