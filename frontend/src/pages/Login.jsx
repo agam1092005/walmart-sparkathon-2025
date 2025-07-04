@@ -19,7 +19,7 @@ function LoginPage() {
       );
       if (res.data.token) {
         setMessage(`✅ Welcome, ${res.data.user.org_name}`);
-        setTimeout(() => navigate('/upload'), 1500);
+        setTimeout(() => navigate('/dashboard'), 1500);
       } else {
         setMessage('❌ Invalid credentials');
       }
