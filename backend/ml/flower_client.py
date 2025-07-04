@@ -9,8 +9,9 @@ import pickle
 import pandas as pd
 from sklearn.model_selection import train_test_split
 from encryption import encrypt_bytes, get_shared_key
-from client_helper import build_model 
+from client_helper import build_model, load_global_preprocessor_from_pocketbase
 import requests
+import base64
 
 MODEL_DIR = "../models"
 
@@ -27,10 +28,29 @@ class FraudDetectionClient(fl.client.NumPyClient):
 
     def fit(self, parameters, config):
         self.model.set_weights(parameters)
-        self.model.fit(self.X_train, self.y_train, epochs=5, batch_size=32)
+        batch_size = min(32, len(self.X_train))
+        if batch_size < 1:
+            print("[ERROR] Not enough samples to train. Skipping fit.")
+            return [b''], 0, {}
+        try:
+            remainder = len(self.X_train) % batch_size
+            if remainder != 0:
+                X_train = self.X_train[:-remainder]
+                y_train = self.y_train[:-remainder]
+            else:
+                X_train = self.X_train
+                y_train = self.y_train
+            self.model.fit(X_train, y_train, epochs=5, batch_size=batch_size)
+        except Exception as e:
+            print(f"[ERROR] Exception during model.fit: {e}")
+            return [b''], 0, {}
         weights_bytes = pickle.dumps(self.model.get_weights())
         encrypted = encrypt_bytes(weights_bytes, get_shared_key())
-        return [encrypted], len(self.X_train), {}
+        if isinstance(encrypted, str):
+            encrypted = encrypted.encode('utf-8')
+        encrypted_b64 = base64.b64encode(encrypted).decode('utf-8')
+        client_id = sys.argv[1] if len(sys.argv) > 1 else "unknown"
+        return [encrypted_b64], len(X_train), {"client_id": client_id}
 
     def evaluate(self, parameters, config):
         self.model.set_weights(parameters)
@@ -39,8 +59,8 @@ class FraudDetectionClient(fl.client.NumPyClient):
 
 def download_model_and_preprocessor_and_dataset(company, pb_token):
     """
-    Download model weights (.h5), preprocessor (.pkl), and dataset (.csv) for the given company from PocketBase.
-    Save as ../models/weights_<company>.h5, ../models/preprocessor_<company>.pkl, ../datasets/<company>.csv
+    Download model (.h5), weights (.h5), preprocessor (.pkl), and dataset (.csv) for the given company from PocketBase.
+    Save as ../models/model_<company>.h5, ../models/weights_<company>.h5, ../models/preprocessor_<company>.pkl, ../datasets/<company>.csv
     """
     POCKETBASE_URL = "http://127.0.0.1:8090"
     headers = {"Authorization": f"Bearer {pb_token}"}
@@ -60,18 +80,34 @@ def download_model_and_preprocessor_and_dataset(company, pb_token):
         if "model" in record and record["model"]:
             model_filename = record["model"]
             model_url = f"{POCKETBASE_URL}/api/files/{collection_id}/{record_id}/{model_filename}"
-            print(f"Downloading model weights from {model_url}")
+            print(f"Downloading model from {model_url}")
             model_resp = requests.get(model_url, headers=headers)
             if model_resp.ok:
-                model_path = os.path.join(MODEL_DIR, f"weights_{company}.h5")
+                model_path = os.path.join(MODEL_DIR, f"model_{company}.h5")
                 with open(model_path, "wb") as f:
                     f.write(model_resp.content)
-                print(f"Model weights saved to {model_path}")
+                print(f"Model saved to {model_path}")
             else:
-                print(f"Failed to download model weights: {model_resp.text}")
+                print(f"Failed to download model: {model_resp.text}")
                 return False
         else:
-            print(f"No model weights found in PocketBase for {company}")
+            print(f"No model found in PocketBase for {company}")
+            return False
+        if "weight" in record and record["weight"]:
+            weight_filename = record["weight"]
+            weight_url = f"{POCKETBASE_URL}/api/files/{collection_id}/{record_id}/{weight_filename}"
+            print(f"Downloading weights from {weight_url}")
+            weight_resp = requests.get(weight_url, headers=headers)
+            if weight_resp.ok:
+                weight_path = os.path.join(MODEL_DIR, f"weights_{company}.h5")
+                with open(weight_path, "wb") as f:
+                    f.write(weight_resp.content)
+                print(f"Weights saved to {weight_path}")
+            else:
+                print(f"Failed to download weights: {weight_resp.text}")
+                return False
+        else:
+            print(f"No weights found in PocketBase for {company}")
             return False
         if "preprocessor" in record and record["preprocessor"]:
             preproc_filename = record["preprocessor"]
@@ -112,20 +148,18 @@ def download_model_and_preprocessor_and_dataset(company, pb_token):
         return False
 
 def start_client(company, pb_token=None):
+    success = False
+    if pb_token is not None:
+        print(f"Downloading all required files for {company} from PocketBase...")
+        success = download_model_and_preprocessor_and_dataset(company, pb_token)
+    if not success:
+        print(f"Could not download required files for {company}. Exiting.")
+        return
+
+    model_path = os.path.join(MODEL_DIR, f"model_{company}.h5")
     weight_path = os.path.join(MODEL_DIR, f"weights_{company}.h5")
     preproc_path = os.path.join(MODEL_DIR, f"preprocessor_{company}.pkl")
     dataset_path = os.path.join("../datasets", f"{company}.csv")
-
-    if not (os.path.exists(weight_path) and os.path.exists(preproc_path) and os.path.exists(dataset_path)):
-        if pb_token is not None:
-            print(f"Required files missing for {company}. Attempting to download from PocketBase...")
-            success = download_model_and_preprocessor_and_dataset(company, pb_token)
-            if not success:
-                print(f"Could not download required files for {company}. Exiting.")
-                return
-        else:
-            print(f"Required files missing for {company} and no PocketBase token provided.")
-            return
 
     try:
         preprocessor = joblib.load(preproc_path)
@@ -154,7 +188,14 @@ def start_client(company, pb_token=None):
         return
 
     client = FraudDetectionClient(model, X_train, y_train, X_test, y_test)
-    fl.client.start_numpy_client(server_address="127.0.0.1:8080", client=client)
+    fl.client.start_client(server_address="127.0.0.1:8080", client=client.to_client())
+
+    for f in [model_path, weight_path, preproc_path, dataset_path]:
+        try:
+            os.remove(f)
+            print(f"Deleted file: {f}")
+        except Exception as e:
+            print(f"Failed to delete file {f}: {e}")
 
 if __name__ == "__main__":
     if len(sys.argv) == 2:

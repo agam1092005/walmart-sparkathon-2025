@@ -9,7 +9,7 @@ import time
 from datetime import datetime
 from sklearn.model_selection import train_test_split
 from sklearn.utils import class_weight
-from client_helper import create_preprocessor, build_model
+from client_helper import create_preprocessor, build_model, load_global_preprocessor_from_pocketbase
 
 POCKETBASE_URL = "http://127.0.0.1:8090"
 
@@ -34,7 +34,7 @@ def get_dataset_url(company, pb_token, max_retries=5, delay=2):
     raise Exception("Dataset not found after several retries")
 
 
-def update_pocketbase_status(company, model_path, preproc_path, pb_token):
+def update_pocketbase_status(company, model_path, weight_path, preproc_path, pb_token):
     headers = {"Authorization": f"Bearer {pb_token}"}
     res = requests.get(f"{POCKETBASE_URL}/api/collections/data/records?filter=company='{company}'", headers=headers)
     items = res.json().get("items", [])
@@ -46,6 +46,7 @@ def update_pocketbase_status(company, model_path, preproc_path, pb_token):
     data = {"hasTrained": "true"}
     files = {
         "model": open(model_path, "rb"),
+        "weight": open(weight_path, "rb"),
         "preprocessor": open(preproc_path, "rb")
     }
     res = requests.patch(
@@ -55,7 +56,7 @@ def update_pocketbase_status(company, model_path, preproc_path, pb_token):
         headers=headers
     )
     if res.ok:
-        print(f"PocketBase updated: hasTrained=True, model and preprocessor uploaded for {company}")
+        print(f"PocketBase updated: hasTrained=True, model, weight, and preprocessor uploaded for {company}")
     else:
         print(f"Failed to update PocketBase for {company}: {res.text}")
 
@@ -64,6 +65,11 @@ def update_pocketbase_status(company, model_path, preproc_path, pb_token):
         print(f"Model file cleaned up: {model_path}")
     except Exception as e:
         print(f"Failed to clean up model file: {e}")
+    try:
+        os.remove(weight_path)
+        print(f"Weight file cleaned up: {weight_path}")
+    except Exception as e:
+        print(f"Failed to clean up weight file: {e}")
     try:
         os.remove(preproc_path)
         print(f"Preprocessor file cleaned up: {preproc_path}")
@@ -115,8 +121,8 @@ def run_local_training(company, pb_token):
 
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
-    preprocessor = create_preprocessor(X_train)
-    X_train = preprocessor.fit_transform(X_train).astype(np.float32)
+    preprocessor = load_global_preprocessor_from_pocketbase(pb_token, X_train=X_train, company=company)
+    X_train = preprocessor.transform(X_train).astype(np.float32)
     X_test = preprocessor.transform(X_test).astype(np.float32)
 
     try:
@@ -130,38 +136,48 @@ def run_local_training(company, pb_token):
     X_train_final, X_val, y_train_final, y_val = train_test_split(X_train, y_train, test_size=0.2, random_state=42)
 
     input_shape = X_train.shape[1]
-    batch_size = 32
-    num_microbatches = 32
-    model = build_model(input_shape, num_microbatches=num_microbatches)
-
+    batch_size = min(32, len(X_train_final))
+    if batch_size < 1:
+        print("[ERROR] Not enough samples to train. Skipping local training.")
+        return
     remainder = len(X_train_final) % batch_size
     if remainder != 0:
         X_train_final = X_train_final[:-remainder]
         y_train_final = y_train_final[:-remainder]
+    num_microbatches = batch_size
+    model = build_model(input_shape, num_microbatches=num_microbatches)
 
-    print(f"Training model for {company}...")
-    model.fit(
-        X_train_final,
-        y_train_final,
-        epochs=10,
-        batch_size=batch_size,
-        validation_data=(X_val, y_val),
-        class_weight=weight_dict
-    )
+    print(f"Training model for {company} with batch_size={batch_size}...")
+    try:
+        model.fit(
+            X_train_final,
+            y_train_final,
+            epochs=10,
+            batch_size=batch_size,
+            validation_data=(X_val, y_val),
+            class_weight=weight_dict
+        )
+    except Exception as e:
+        print(f"[ERROR] Exception during model.fit: {e}")
+        return
 
     MODEL_DIR = "../models"
     os.makedirs(MODEL_DIR, exist_ok=True)
 
+    # Save both full model and weights
+    model_path = os.path.join(MODEL_DIR, f"model_{company}.h5")
     weight_path = os.path.join(MODEL_DIR, f"weights_{company}.h5")
+    model.save(model_path)
     model.save_weights(weight_path)
 
     preproc_path = os.path.join(MODEL_DIR, f"preprocessor_{company}.pkl")
     joblib.dump(preprocessor, preproc_path)
 
+    print(f"Model saved to: {model_path}")
     print(f"Weights saved to: {weight_path}")
     print(f"Preprocessor saved to: {preproc_path}")
 
-    update_pocketbase_status(company, weight_path, preproc_path, pb_token)
+    update_pocketbase_status(company, model_path, weight_path, preproc_path, pb_token)
 
     push_to_global_model(company, model, pb_token)
 
