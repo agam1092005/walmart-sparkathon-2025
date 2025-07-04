@@ -21,3 +21,20 @@ def login_user(email, password):
     }
     resp = requests.post(f"{POCKETBASE_URL}/api/collections/{USERS_COLLECTION}/auth-with-password", json=data)
     return resp.json() if resp.status_code == 200 else None
+
+def get_company_data_by_token(token):
+    """Get company data using the provided token"""
+    headers = {
+        'Authorization': f'Bearer {token}'
+    }
+    # First validate the token by getting user info
+    resp = requests.get(f"{POCKETBASE_URL}/api/users/profile", headers=headers)
+    if resp.status_code != 200:
+        return None
+    
+    user_data = resp.json()
+    return {
+        'org_name': user_data.get('org_name'),
+        'email': user_data.get('email'),
+        'id': user_data.get('id')
+    }

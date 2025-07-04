@@ -4,6 +4,11 @@ from .models import upload_to_pocketbase, start_background_training, get_company
 ml_bp = Blueprint('ml_bp', __name__)
 POCKETBASE_URL = "http://127.0.0.1:8090"
 
+@ml_bp.route('/health', methods=['GET'])
+def health_check():
+    """Simple health check endpoint"""
+    return jsonify({"status": "healthy", "message": "ML service is running"}), 200
+
 @ml_bp.route('/upload', methods=['POST'])
 def upload_csv():
     token = request.cookies.get('pb_token')
@@ -48,3 +53,53 @@ def status_company(company):
     if error:
         return jsonify(error), status
     return jsonify(result), 200
+
+@ml_bp.route('/status', methods=['GET'])
+def get_user_status():
+    """Get status for the authenticated user's company"""
+    token = request.cookies.get('pb_token')
+    if not token:
+        auth_header = request.headers.get('Authorization', '')
+        if auth_header.startswith('Bearer '):
+            token = auth_header.split(' ', 1)[1]
+    if not token:
+        return jsonify({"msg": "No token found"}), 401
+    
+    org_name = get_user_org_name_from_token(token)
+    if not org_name:
+        return jsonify({"msg": "Invalid token"}), 401
+    
+    print(f"[DEBUG] Fetching status for org: {org_name}")
+    status_result, error, status_code = get_company_status(org_name)
+    
+    if error:
+        print(f"[DEBUG] Error fetching status: {error}, status_code: {status_code}")
+        if status_code == 404:
+            status_data = {
+                "org_name": org_name,
+                "submitted": False,
+                "hasTrained": False,
+                "encrypted": False,
+            }
+            print(f"[DEBUG] Returning default status for new company: {status_data}")
+            return jsonify(status_data), 200
+        else:
+            return jsonify({"msg": "Error fetching status", "error": error}), status_code
+    
+    # Helper function to safely convert to boolean
+    def to_bool(value):
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, str):
+            return value.lower() == 'true'
+        return False
+    
+    status_data = {
+        "org_name": org_name,
+        "submitted": to_bool(status_result.get('submitted', False)),
+        "hasTrained": to_bool(status_result.get('hasTrained', False)),
+        "encrypted": to_bool(status_result.get('encrypted', False)),
+    }
+    
+    print(f"[DEBUG] Returning status data: {status_data}")
+    return jsonify(status_data), 200

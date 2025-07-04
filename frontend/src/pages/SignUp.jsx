@@ -1,8 +1,10 @@
-import { useState } from 'react';
+import { useState, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import { LocoScrollContext } from '../App';
 
 function SignUpPage() {
+  const { scrollRef, locomotiveInstance } = useContext(LocoScrollContext);
   const [orgName, setOrgName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');

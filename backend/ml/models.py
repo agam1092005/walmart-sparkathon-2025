@@ -78,13 +78,13 @@ def get_company_status(company):
         'hasTrained': record.get('hasTrained'),
         'encrypted': record.get('encrypted'),
     }
-    if 'modelPath' in record:
-        result['modelPath'] = record['modelPath']
-    if 'dataset' in record and record['dataset']:
-        collection_id = record.get('collectionId', DATA_COLLECTION)
-        record_id = record.get('id')
-        filename = record['dataset']
-        result['datasetUrl'] = f"{POCKETBASE_URL}/api/files/{collection_id}/{record_id}/{filename}"
+    # if 'modelPath' in record:
+    #     result['modelPath'] = record['modelPath']
+    # if 'dataset' in record and record['dataset']:
+    #     collection_id = record.get('collectionId', DATA_COLLECTION)
+    #     record_id = record.get('id')
+    #     filename = record['dataset']
+    #     result['datasetUrl'] = f"{POCKETBASE_URL}/api/files/{collection_id}/{record_id}/{filename}"
     return result, None, 200
 
 def get_user_org_name_from_token(token):

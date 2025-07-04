@@ -1,8 +1,10 @@
-import { useState } from 'react';
+import { useState, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import { LocoScrollContext } from '../App';
 
 function UploadPage() {
+  const { scrollRef, locomotiveInstance } = useContext(LocoScrollContext);
   const [file, setFile] = useState(null);
   const [message, setMessage] = useState('');
   const navigate = useNavigate();
@@ -19,7 +21,7 @@ function UploadPage() {
         { withCredentials: true }
       );
       setMessage('✅ Upload successful! Training started.');
-      setTimeout(() => navigate('/result'), 1500);
+      setTimeout(() => navigate('/dashboard'), 1500);
     } catch (error) {
       setMessage('❌ Upload failed.');
     }

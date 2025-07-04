@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify, make_response
-from .models import signup_user, login_user
+from .models import signup_user, login_user, get_company_data_by_token
 from flask_jwt_extended import create_access_token
 
 auth_bp = Blueprint('auth_bp', __name__)
@@ -39,7 +39,7 @@ def signin():
         "user": user
     }), 200)
     # Set the token as a cookie (HttpOnly, Secure)
-    resp.set_cookie('pb_token', token, httponly=True, secure=True, samesite='Lax')
+    resp.set_cookie('pb_token', token, httponly=False, samesite='Lax')
     return resp
 
 @auth_bp.route('/logout', methods=['POST'])
@@ -47,3 +47,5 @@ def logout():
     resp = make_response(jsonify({"msg": "Logged out"}))
     resp.set_cookie('pb_token', '', expires=0)
     return resp
+
+
