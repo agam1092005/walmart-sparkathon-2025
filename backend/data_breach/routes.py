@@ -14,7 +14,6 @@ import os
 data_breach_bp = Blueprint('data_breach_bp', __name__)
 
 def scrape_xposedornot(domain):
-    # Set up headless Chrome
     chrome_options = Options()
     chrome_options.add_argument("--headless=new")
     chrome_options.add_argument("--no-sandbox")
@@ -26,13 +25,11 @@ def scrape_xposedornot(domain):
         driver.get("https://xposedornot.com/breaches")
         time.sleep(2)  # Wait for page to load
 
-        # Find the search bar and enter the domain
         search_input = driver.find_element(By.CSS_SELECTOR, "input[type='search']")
         search_input.clear()
         search_input.send_keys(domain)
         time.sleep(2)  # Wait for table to update
 
-        # Find the table rows
         rows = driver.find_elements(By.CSS_SELECTOR, "table tbody tr")
         results = []
         for row in rows:
@@ -56,22 +53,17 @@ def scrape_xposedornot(domain):
 def search_breach_csv(company_name):
     """Search for company breaches in the local breach.csv file"""
     try:
-        # Path to the breach.csv file
         csv_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), '..', 'datasets', 'breach.csv')
         
-        # Read the CSV file
         df = pd.read_csv(csv_path)
         
-        # Search for company name in the Breach ID column (first column)
         company_lower = company_name.lower()
         
-        # Search in Breach ID column only
         matches = df[df['Breach ID'].str.lower().str.contains(company_lower, na=False)]
         
         if matches.empty:
             return []
         
-        # Convert to list of dictionaries
         results = []
         for _, row in matches.iterrows():
             result = {

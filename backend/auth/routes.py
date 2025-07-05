@@ -38,7 +38,6 @@ def signin():
         "token": token,
         "user": user
     }), 200)
-    # Set the token as a cookie (HttpOnly, Secure)
     resp.set_cookie('pb_token', token, httponly=False, samesite='Lax')
     return resp
 

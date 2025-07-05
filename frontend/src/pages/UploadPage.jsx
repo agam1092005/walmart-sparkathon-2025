@@ -1,10 +1,8 @@
-import { useState, useContext } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import { LocoScrollContext } from '../App';
 
 function UploadPage() {
-  const { scrollRef, locomotiveInstance } = useContext(LocoScrollContext);
   const [file, setFile] = useState(null);
   const [message, setMessage] = useState('');
   const navigate = useNavigate();

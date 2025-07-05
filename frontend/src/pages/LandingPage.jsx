@@ -83,9 +83,8 @@ function LandingPage() {
           </ScrollReveal>
         </div>
       </div>
-      {/* FAQ Section */}
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', margin: '32px 0' }}>
-        <div style={{ width: '100%', maxWidth: '600px' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', margin: '32px 0'}}>
+        <div style={{ width: '100%', maxWidth: '600px'}}>
           {[{
             q: 'What is federated learning?',
             a: 'Federated learning is a collaborative machine learning approach where data remains decentralized and only model updates are shared.'
@@ -115,13 +114,14 @@ function LandingPage() {
         </div>
       </div>
       <TrueFocus 
-          sentence="Customer data never leaves your walls."
-          manualMode={false}
-          blurAmount={6}
-          borderColor="cyan"
-          animationDuration={0.5}
-          pauseBetweenAnimations={1}
-        />
+            sentence="Customer data never leaves your walls."
+            manualMode={false}
+            blurAmount={6}
+            borderColor="cyan"
+            animationDuration={0.5}
+            pauseBetweenAnimations={1}
+          />
+      <div style={{ height: '40px' }}></div>
     </div>
   );
 }

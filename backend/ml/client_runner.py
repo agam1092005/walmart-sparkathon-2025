@@ -164,7 +164,6 @@ def run_local_training(company, pb_token):
     MODEL_DIR = "../models"
     os.makedirs(MODEL_DIR, exist_ok=True)
 
-    # Save both full model and weights
     model_path = os.path.join(MODEL_DIR, f"model_{company}.h5")
     weight_path = os.path.join(MODEL_DIR, f"weights_{company}.h5")
     model.save(model_path)

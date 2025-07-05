@@ -36,28 +36,57 @@ def upload_to_pocketbase(company, file, token=None):
         txt_path = tmp_txt.name
     txt_filename = secure_filename(os.path.splitext(file.filename)[0] + '.txt')
 
-    data = {
-        'company': company,
-        'submitted': 'true',
-        'hasTrained': 'false',
-        'encrypted': 'false'
-    }
-    files = {
-        'dataset': (txt_filename, open(txt_path, 'rb'), 'text/plain')
-    }
     headers = {'Authorization': f'Bearer {token}'}
-    resp = requests.post(
-        f"{POCKETBASE_URL}/api/collections/{DATA_COLLECTION}/records",
-        data=data,
-        files=files,
-        headers=headers
-    )
-    os.remove(txt_path)
-    if resp.status_code == 400 and 'already exists' in resp.text:
-        return False, {'error': 'Company already exists'}, 409
-    if not resp.ok:
-        return False, {'error': 'PocketBase error', 'details': resp.text}, 500
-    return True, {'success': True, 'record': resp.json()}, 200
+    check_resp = requests.get(f"{POCKETBASE_URL}/api/collections/{DATA_COLLECTION}/records?filter=company='{company}'", headers=headers)
+    
+    if not check_resp.ok:
+        return False, {'error': 'Failed to check existing data entry'}, 500
+    
+    items = check_resp.json().get('items', [])
+    
+    if not items:
+        data = {
+            'company': company,
+            'submitted': 'true',
+            'hasTrained': 'false',
+            'encrypted': 'false',
+            'detected_threats': '0'
+        }
+        files = {
+            'dataset': (txt_filename, open(txt_path, 'rb'), 'text/plain')
+        }
+        resp = requests.post(
+            f"{POCKETBASE_URL}/api/collections/{DATA_COLLECTION}/records",
+            data=data,
+            files=files,
+            headers=headers
+        )
+        os.remove(txt_path)
+        if resp.status_code == 400 and 'already exists' in resp.text:
+            return False, {'error': 'Company already exists'}, 409
+        if not resp.ok:
+            return False, {'error': 'PocketBase error', 'details': resp.text}, 500
+        return True, {'success': True, 'record': resp.json()}, 200
+    else:
+        record_id = items[0]['id']
+        data = {
+            'submitted': 'true',
+            'hasTrained': 'false',
+            'encrypted': 'false'
+        }
+        files = {
+            'dataset': (txt_filename, open(txt_path, 'rb'), 'text/plain')
+        }
+        resp = requests.patch(
+            f"{POCKETBASE_URL}/api/collections/{DATA_COLLECTION}/records/{record_id}",
+            data=data,
+            files=files,
+            headers=headers
+        )
+        os.remove(txt_path)
+        if not resp.ok:
+            return False, {'error': 'PocketBase error', 'details': resp.text}, 500
+        return True, {'success': True, 'record': resp.json()}, 200
 
 def start_background_training(company, pb_token):
     script_path = os.path.join(os.path.dirname(__file__), 'client_runner.py')
@@ -77,14 +106,9 @@ def get_company_status(company):
         'submitted': record.get('submitted'),
         'hasTrained': record.get('hasTrained'),
         'encrypted': record.get('encrypted'),
+        'detected': record.get('detected'),
     }
-    # if 'modelPath' in record:
-    #     result['modelPath'] = record['modelPath']
-    # if 'dataset' in record and record['dataset']:
-    #     collection_id = record.get('collectionId', DATA_COLLECTION)
-    #     record_id = record.get('id')
-    #     filename = record['dataset']
-    #     result['datasetUrl'] = f"{POCKETBASE_URL}/api/files/{collection_id}/{record_id}/{filename}"
+
     return result, None, 200
 
 def get_user_org_name_from_token(token):

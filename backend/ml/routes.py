@@ -1,8 +1,20 @@
 from flask import Blueprint, request, jsonify
 from .models import upload_to_pocketbase, start_background_training, get_company_status, get_user_org_name_from_token
+import requests
 
 ml_bp = Blueprint('ml_bp', __name__)
 POCKETBASE_URL = "http://127.0.0.1:8090"
+
+def get_num_clients_from_pocketbase():
+    """Get the number of unique clients from the global collection in PocketBase"""
+
+    res = requests.get(f"{POCKETBASE_URL}/api/collections/global/records")
+    res.raise_for_status()
+    items = res.json().get("items", [])
+    if not items:
+        return 0
+    return items[0].get("clients")
+
 
 @ml_bp.route('/health', methods=['GET'])
 def health_check():
@@ -80,13 +92,13 @@ def get_user_status():
                 "submitted": False,
                 "hasTrained": False,
                 "encrypted": False,
+                "detected": 0,
             }
             print(f"[DEBUG] Returning default status for new company: {status_data}")
             return jsonify(status_data), 200
         else:
             return jsonify({"msg": "Error fetching status", "error": error}), status_code
     
-    # Helper function to safely convert to boolean
     def to_bool(value):
         if isinstance(value, bool):
             return value
@@ -99,7 +111,23 @@ def get_user_status():
         "submitted": to_bool(status_result.get('submitted', False)),
         "hasTrained": to_bool(status_result.get('hasTrained', False)),
         "encrypted": to_bool(status_result.get('encrypted', False)),
+        "detected": int(status_result.get('detected')),
     }
     
     print(f"[DEBUG] Returning status data: {status_data}")
     return jsonify(status_data), 200
+
+@ml_bp.route('/clients_count', methods=['GET'])
+def get_clients_count():
+    """Get the number of clients contributing to the global model"""
+    try:
+        num_clients = get_num_clients_from_pocketbase()
+        return jsonify({
+            "num_clients": num_clients,
+            "status": "success"
+        }), 200
+    except Exception as e:
+        return jsonify({
+            "error": "Failed to fetch client count",
+            "details": str(e)
+        }), 500

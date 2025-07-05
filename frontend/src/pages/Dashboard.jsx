@@ -21,16 +21,35 @@ function StatusDot({ color }) {
 }
 
 function Dashboard() {
-  const { scrollRef, locomotiveInstance } = useContext(LocoScrollContext);
   const [status, setStatus] = useState(null);
   const [loading, setLoading] = useState(true);
   const [companyName, setCompanyName] = useState('');
   const [breachData, setBreachData] = useState([]);
   const [breachLoading, setBreachLoading] = useState(false);
+  const [clientCount, setClientCount] = useState(0);
+  const [detectedThreats, setDetectedThreats] = useState(0);
   const intervalRef = useRef();
   const navigate = useNavigate();
 
-  // Function to fetch breach data for the company
+  const fetchClientCount = async () => {
+    try {
+      const res = await fetch('http://localhost:5555/v1/ml/clients_count', {
+        credentials: 'include'
+      });
+      
+      if (res.ok) {
+        const data = await res.json();
+        setClientCount(data.num_clients || 0);
+      } else {
+        console.error('Failed to fetch client count');
+        setClientCount(0);
+      }
+    } catch (error) {
+      console.error('Error fetching client count:', error);
+      setClientCount(0);
+    }
+  };
+
   const fetchBreachData = async (company) => {
     if (!company || company === 'Unknown Company') return;
     
@@ -66,12 +85,11 @@ function Dashboard() {
       try {
         console.log('[DEBUG] Fetching status from /v1/ml/status');
         const res = await fetch('http://localhost:5555/v1/ml/status', {
-          credentials: 'include' // Include cookies
+          credentials: 'include'
         });
         console.log('[DEBUG] Response status:', res.status);
         if (!res.ok) {
           if (res.status === 401) {
-            // Token expired or invalid, redirect to login
             console.log('[DEBUG] 401 error, redirecting to login');
             clearAuthCookies();
             navigate('/login');
@@ -84,18 +102,23 @@ function Dashboard() {
         setStatus(data);
         const company = data.org_name ? data.org_name : 'Unknown Company';
         setCompanyName(company);
+        setDetectedThreats(data.detected || 0);
         setLoading(false);
         
-        // Fetch breach data for the company
         if (company !== 'Unknown Company') {
           fetchBreachData(company);
         }
         
-        // Stop polling if encrypted is true (global model is ready)
         if (data.encrypted && intervalRef.current) {
           console.log('[DEBUG] Encrypted is true, stopping polling');
           clearInterval(intervalRef.current);
           intervalRef.current = null;
+          fetchClientCount();
+        }
+        
+        if (data.submitted && !data.encrypted && !intervalRef.current) {
+          console.log('[DEBUG] Dataset submitted, starting polling');
+          intervalRef.current = setInterval(fetchStatus, 5000);
         }
       } catch (e) {
         console.error('Error fetching status:', e);
@@ -106,9 +129,7 @@ function Dashboard() {
     }
     
     fetchStatus();
-    if (!intervalRef.current) {
-      intervalRef.current = setInterval(fetchStatus, 5000); // Poll every 5 seconds
-    }
+    fetchClientCount();
     
     return () => {
       stopped = true;
@@ -154,7 +175,6 @@ function Dashboard() {
 
   return (
     <div style={{ minHeight: '100vh', background: 'none' }}>
-      {/* Navbar at the very top */}
       <div style={{
         width: '100%',
         display: 'flex',
@@ -199,7 +219,6 @@ function Dashboard() {
           Logout
         </button>
       </div>
-      {/* Main content below navbar */}
       <div style={{
         display: 'flex',
         flexDirection: 'column',
@@ -208,7 +227,6 @@ function Dashboard() {
         minHeight: 'calc(100vh - 80px)',
         padding: '0 20px'
       }}>
-        {/* Welcome Text */}
         <div style={{ 
           marginTop: '70px',
           textAlign: 'left',
@@ -227,13 +245,11 @@ function Dashboard() {
           </div>
         ) : (
           <>
-            {/* Status Cards Row */}
             <div style={{ 
               display: 'flex', 
               gap: '20px', 
               marginBottom: 24
             }}>
-              {/* First Status Card - Original */}
               <div style={{ 
                 padding: '40px',
                 background: 'rgba(255,255,255,0.03)',
@@ -276,7 +292,6 @@ function Dashboard() {
                 )}
               </div>
 
-              {/* Second Status Card - Clients Contributing */}
               <div style={{ 
                 padding: '30px',
                 background: 'rgba(255,255,255,0.03)',
@@ -288,14 +303,13 @@ function Dashboard() {
               }}>
                 <span style={{ fontWeight: 500, fontSize: '1rem' }}>Clients Contributing</span>
                 <div style={{ fontSize: '2rem', color: '#4caf50', marginTop: 8, fontWeight: 'bold' }}>
-                  4
+                  {clientCount}
                 </div>
                 <div style={{ fontSize: '0.9rem', color: '#888', marginTop: 4 }}>
                   Active participants
                 </div>
               </div>
 
-              {/* Third Status Card - Bots & Suspicion Detected */}
               <div style={{ 
                 padding: '30px',
                 background: 'rgba(255,255,255,0.03)',
@@ -307,7 +321,7 @@ function Dashboard() {
               }}>
                 <span style={{ fontWeight: 500, fontSize: '1rem' }}>Bots & Suspicion Detected</span>
                 <div style={{ fontSize: '2rem', color: '#ff6b6b', marginTop: 8, fontWeight: 'bold' }}>
-                  26
+                  {detectedThreats}
                 </div>
                 <div style={{ fontSize: '0.9rem', color: '#888', marginTop: 4 }}>
                   Threats identified
@@ -316,7 +330,6 @@ function Dashboard() {
             </div>
            
 
-            {/* Data Breach Information Section */}
             {companyName && companyName !== 'Unknown Company' && (
               <div style={{ 
                 marginBottom: 24,
@@ -351,7 +364,6 @@ function Dashboard() {
                       ⚠️ Found {breachData.length} breach record(s) for this company
                     </p>
                     
-                    {/* Table Header */}
                     <div style={{
                       display: 'grid',
                       gridTemplateColumns: '1fr 1fr 1fr 1fr 1fr 1fr 1fr',
@@ -373,7 +385,6 @@ function Dashboard() {
                       <div style={{ color: '#00bcd4' }}>Risk</div>
                     </div>
                     
-                    {/* Table Rows */}
                     {breachData.map((breach, index) => (
                       <div key={index} style={{
                         display: 'grid',
@@ -414,7 +425,6 @@ function Dashboard() {
                       </div>
                     ))}
                     
-                    {/* Description Section */}
                     {breachData.map((breach, index) => (
                       <div key={`desc-${index}`} style={{
                         background: 'rgba(0, 0, 0, 0.2)',

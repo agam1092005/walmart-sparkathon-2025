@@ -1,10 +1,8 @@
-import { useState, useContext } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import { LocoScrollContext } from '../App';
 
 function SignUpPage() {
-  const { scrollRef, locomotiveInstance } = useContext(LocoScrollContext);
   const [orgName, setOrgName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -28,33 +26,35 @@ function SignUpPage() {
   };
 
   return (
-    <div className="page">
-      <h2>Sign Up</h2>
-      <form onSubmit={handleSignUp}>
-        <input
-          type="text"
-          placeholder="Organization Name"
-          value={orgName}
-          onChange={e => setOrgName(e.target.value)}
-          required
-        />
-        <input
-          type="email"
-          placeholder="Email"
-          value={email}
-          onChange={e => setEmail(e.target.value)}
-          required
-        />
-        <input
-          type="password"
-          placeholder="Password"
-          value={password}
-          onChange={e => setPassword(e.target.value)}
-          required
-        />
-        <button type="submit">Register</button>
-      </form>
-      {message && <p className="message">{message}</p>}
+    <div className="center-container">
+      <div className="page">
+        <h2>Sign Up</h2>
+        <form onSubmit={handleSignUp}>
+          <input
+            type="text"
+            placeholder="Organization Name"
+            value={orgName}
+            onChange={e => setOrgName(e.target.value)}
+            required
+          />
+          <input
+            type="email"
+            placeholder="Email"
+            value={email}
+            onChange={e => setEmail(e.target.value)}
+            required
+          />
+          <input
+            type="password"
+            placeholder="Password"
+            value={password}
+            onChange={e => setPassword(e.target.value)}
+            required
+          />
+          <button type="submit">Register</button>
+        </form>
+        {message && <p className="message">{message}</p>}
+      </div>
     </div>
   );
 }

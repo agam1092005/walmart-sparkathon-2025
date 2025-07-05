@@ -29,7 +29,6 @@ if not PB_TOKEN:
 headers = {"Authorization": f"Bearer {PB_TOKEN}"}
 
 def decrypt_weights(ciphertext_str: str) -> list:
-    # Decode from base64 if needed
     if isinstance(ciphertext_str, str):
         ciphertext_bytes = base64.b64decode(ciphertext_str)
     else:
@@ -100,7 +99,6 @@ class SecureFedAvg(fl.server.strategy.FedAvg):
             return {}
 
     def upload_client_weights(self, client_weights_dict):
-        # Upload updated client_weights.pkl to PocketBase
         try:
             res = requests.get(f"{POCKETBASE_URL}/api/collections/global/records", headers=headers)
             res.raise_for_status()
@@ -130,7 +128,6 @@ class SecureFedAvg(fl.server.strategy.FedAvg):
 
     def aggregate_fit(self, server_round, results, failures):
         print(f"[DEBUG] aggregate_fit called for round {server_round} with {len(results)} results and {len(failures)} failures.")
-        # Load previous client weights
         client_weights_dict = self.download_client_weights()
         decrypted_results = []
         contributing_clients = set()
@@ -175,7 +172,6 @@ class SecureFedAvg(fl.server.strategy.FedAvg):
                     with open(model_path, "rb") as f:
                         files = {"global_model": f}
                         data = {"round": str(server_round), "clients": str(len(client_weights_dict))}
-                        # Always PATCH the first (only) global record
                         res = requests.get(f"{POCKETBASE_URL}/api/collections/global/records", headers=headers)
                         items = res.json().get("items", [])
                         if not items:
@@ -273,7 +269,6 @@ def build_and_upload_global_preprocessor(pb_token, dataset_paths):
         dfs.append(df)
     df_all = pd.concat(dfs, axis=0, ignore_index=True)
     X = df_all.drop('label_is_fraud', axis=1)
-    # Build preprocessor
     categorical_cols = X.select_dtypes(include=['object', 'category']).columns.tolist()
     numerical_cols = X.select_dtypes(include=['int64', 'float64']).columns.tolist()
     numerical_pipeline = Pipeline([
@@ -289,7 +284,6 @@ def build_and_upload_global_preprocessor(pb_token, dataset_paths):
         ('cat', categorical_pipeline, categorical_cols)
     ])
     preprocessor.fit(X)
-    # Save preprocessor
     preproc_path = os.path.join(MODEL_DIR, 'global_preprocessor.pkl')
     joblib.dump(preprocessor, preproc_path)
     with open(preproc_path, 'rb') as f:

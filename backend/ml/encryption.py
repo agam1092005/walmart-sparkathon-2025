@@ -28,7 +28,6 @@ def decrypt_bytes(ciphertext: str, key: bytes = None) -> bytes:
         key = get_shared_key()
     fernet_key = base64.urlsafe_b64encode(key[:32])
     cipher = Fernet(fernet_key)
-    # Only encode if ciphertext is str
     if isinstance(ciphertext, str):
         ciphertext = ciphertext.encode()
     return cipher.decrypt(ciphertext)

@@ -3,8 +3,6 @@ import { useEffect, useRef, useState, createContext } from 'react';
 import LoginPage from './pages/Login';
 import SignUpPage from './pages/SignUp';
 import UploadPage from './pages/UploadPage';
-// import Header from './components/header';
-import LandingPage from './pages/LandingPage';
 import Dashboard from './pages/Dashboard';
 import ProtectedRoute from './components/ProtectedRoute';
 import RootRedirect from './components/RootRedirect';
