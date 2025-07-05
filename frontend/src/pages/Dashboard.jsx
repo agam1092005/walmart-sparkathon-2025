@@ -25,15 +25,47 @@ function Dashboard() {
   const [status, setStatus] = useState(null);
   const [loading, setLoading] = useState(true);
   const [companyName, setCompanyName] = useState('');
+  const [breachData, setBreachData] = useState([]);
+  const [breachLoading, setBreachLoading] = useState(false);
   const intervalRef = useRef();
   const navigate = useNavigate();
+
+  // Function to fetch breach data for the company
+  const fetchBreachData = async (company) => {
+    if (!company || company === 'Unknown Company') return;
+    
+    setBreachLoading(true);
+    try {
+      const res = await fetch('http://localhost:5555/v1/data_breach/search_local', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({ company_name: company })
+      });
+      
+      if (res.ok) {
+        const data = await res.json();
+        setBreachData(data.results || []);
+      } else {
+        console.error('Failed to fetch breach data');
+        setBreachData([]);
+      }
+    } catch (error) {
+      console.error('Error fetching breach data:', error);
+      setBreachData([]);
+    } finally {
+      setBreachLoading(false);
+    }
+  };
 
   useEffect(() => {
     let stopped = false;
     async function fetchStatus() {
       try {
         console.log('[DEBUG] Fetching status from /v1/ml/status');
-        const res = await fetch('/v1/ml/status', {
+        const res = await fetch('http://localhost:5555/v1/ml/status', {
           credentials: 'include' // Include cookies
         });
         console.log('[DEBUG] Response status:', res.status);
@@ -50,8 +82,15 @@ function Dashboard() {
         const data = await res.json();
         console.log('[DEBUG] Status data received:', data);
         setStatus(data);
-        setCompanyName(data.org_name ? data.org_name : 'Unknown Company');
+        const company = data.org_name ? data.org_name : 'Unknown Company';
+        setCompanyName(company);
         setLoading(false);
+        
+        // Fetch breach data for the company
+        if (company !== 'Unknown Company') {
+          fetchBreachData(company);
+        }
+        
         // Stop polling if encrypted is true (global model is ready)
         if (data.encrypted && intervalRef.current) {
           console.log('[DEBUG] Encrypted is true, stopping polling');
@@ -132,7 +171,7 @@ function Dashboard() {
         boxShadow: '0 2px 10px rgba(0, 188, 212, 0.1)',
       }}>
         <div style={{ fontWeight: 700, fontSize: '1.25rem', letterSpacing: 0.5, color: '#00bcd4' }}>
-          {loading ? 'Loading...' : (companyName || 'Unknown Company')}
+          {loading ? 'Loading...' : (companyName ? `${companyName} Dashboard` : 'Dashboard')}
         </div>
         <button
           onClick={handleLogout}
@@ -162,36 +201,24 @@ function Dashboard() {
       </div>
       {/* Main content below navbar */}
       <div style={{
-
         display: 'flex',
         flexDirection: 'column',
-        alignItems: 'center',
+        alignItems: 'left',
         justifyContent: 'flex-start',
         minHeight: 'calc(100vh - 80px)',
         padding: '0 20px'
       }}>
-        {/* Company Name Header */}
+        {/* Welcome Text */}
         <div style={{ 
-             marginTop: '100px',
-          marginBottom: '32px', 
-          textAlign: 'center',
-          padding: '20px',
-          background: 'rgba(255,255,255,0.05)',
-          borderRadius: '12px',
-          border: '1px solid rgba(255,255,255,0.1)',
+          marginTop: '70px',
+          textAlign: 'left',
           width: '100%',
           maxWidth: '600px'
         }}>
-          <h1 style={{ 
-            margin: 0, 
-            fontSize: '2rem', 
-            fontWeight: 700,
-            color: '#00bcd4',
-            textTransform: 'uppercase',
-            letterSpacing: '1px'
-          }}>
-            {companyName}
-          </h1>
+          <p style={{ margin: '20px 0px', fontSize: '1.1rem' }}>
+              Welcome back! View your security stats from here.
+          </p>
+         
         </div>
 
         {loading ? (
@@ -200,30 +227,229 @@ function Dashboard() {
           </div>
         ) : (
           <>
+            {/* Status Cards Row */}
             <div style={{ 
-              marginBottom: 24,
-              padding: '20px',
-              background: 'rgba(255,255,255,0.03)',
-              borderRadius: '12px',
-              border: '1px solid rgba(255,255,255,0.08)',
-              width: '100%',
-              maxWidth: '600px',
-              textAlign: 'center'
+              display: 'flex', 
+              gap: '20px', 
+              marginBottom: 24
             }}>
-              <StatusDot color={dotColor} />
-              <span style={{ fontWeight: 500, fontSize: '1.1rem' }}>{statusMsg}</span>
-              {subMsg && (
-                <div style={{ fontSize: '0.95rem', color: '#888', marginTop: 8 }}>{subMsg}</div>
-              )}
+              {/* First Status Card - Original */}
+              <div style={{ 
+                padding: '40px',
+                background: 'rgba(255,255,255,0.03)',
+                borderRadius: '12px',
+                border: '1px solid rgba(255,255,255,0.08)',
+                flex: '1',
+                textAlign: 'left',
+                minWidth: '300px'
+              }}>
+                <StatusDot color={dotColor} />
+                <span style={{ fontWeight: 500, fontSize: '1.1rem' }}>{statusMsg}</span>
+                {subMsg && (
+                  <div style={{ fontSize: '0.95rem', color: '#888', marginTop: 8 }}>{subMsg}</div>
+                )}
+                {showUpload && (
+                  <div style={{ marginTop: '20px' }}>
+                    <Link to="/upload">
+                      <button style={{ 
+                        background: '#00bcd4', 
+                        color: '#fff', 
+                        border: 'none', 
+                        borderRadius: 6, 
+                        padding: '10px 22px', 
+                        fontWeight: 600, 
+                        fontSize: '1rem', 
+                        cursor: 'pointer',
+                        transition: 'background 0.2s ease'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.target.style.background = '#00a0b0';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.target.style.background = '#00bcd4';
+                      }}
+                      >
+                        Upload Dataset
+                      </button>
+                    </Link>
+                  </div>
+                )}
+              </div>
+
+              {/* Second Status Card - Clients Contributing */}
+              <div style={{ 
+                padding: '30px',
+                background: 'rgba(255,255,255,0.03)',
+                borderRadius: '12px',
+                border: '1px solid rgba(255,255,255,0.08)',
+                flex: '1',
+                textAlign: 'left',
+                minWidth: '200px'
+              }}>
+                <span style={{ fontWeight: 500, fontSize: '1rem' }}>Clients Contributing</span>
+                <div style={{ fontSize: '2rem', color: '#4caf50', marginTop: 8, fontWeight: 'bold' }}>
+                  4
+                </div>
+                <div style={{ fontSize: '0.9rem', color: '#888', marginTop: 4 }}>
+                  Active participants
+                </div>
+              </div>
+
+              {/* Third Status Card - Bots & Suspicion Detected */}
+              <div style={{ 
+                padding: '30px',
+                background: 'rgba(255,255,255,0.03)',
+                borderRadius: '12px',
+                border: '1px solid rgba(255,255,255,0.08)',
+                flex: '1',
+                textAlign: 'left',
+                minWidth: '200px'
+              }}>
+                <span style={{ fontWeight: 500, fontSize: '1rem' }}>Bots & Suspicion Detected</span>
+                <div style={{ fontSize: '2rem', color: '#ff6b6b', marginTop: 8, fontWeight: 'bold' }}>
+                  26
+                </div>
+                <div style={{ fontSize: '0.9rem', color: '#888', marginTop: 4 }}>
+                  Threats identified
+                </div>
+              </div>
             </div>
-            <p style={{ margin: '20px 0', fontSize: '1.1rem', textAlign: 'center' }}>
-              Welcome to your dashboard! What would you like to do next?
-            </p>
-            {showUpload && (
-              <div style={{ marginTop: '32px', textAlign: 'center' }}>
-                <Link to="/upload">
-                  <button style={{ background: '#00bcd4', color: '#fff', border: 'none', borderRadius: 6, padding: '10px 22px', fontWeight: 600, fontSize: '1rem', cursor: 'pointer' }}>Upload Dataset</button>
-                </Link>
+           
+
+            {/* Data Breach Information Section */}
+            {companyName && companyName !== 'Unknown Company' && (
+              <div style={{ 
+                marginBottom: 24,
+                padding: '40px',
+                background: 'rgba(255,255,255,0.03)',
+                borderRadius: '12px',
+                border: '1px solid rgba(255,255,255,0.08)',
+                width: '100%',
+                textAlign: 'left'
+              }}>
+                <h3 style={{ 
+                  color: '#00bcd4', 
+                  marginBottom: '20px', 
+                  fontSize: '1.3rem',
+                  fontWeight: 600 
+                }}>
+                  Data Breach Information for {companyName}
+                </h3>
+                
+                {breachLoading ? (
+                  <div style={{ color: '#888', fontSize: '1rem' }}>
+                    Loading breach data...
+                  </div>
+                ) : breachData.length > 0 ? (
+                  <div>
+                    <p style={{ 
+                      color: '#ff6b6b', 
+                      fontSize: '1rem', 
+                      marginBottom: '20px',
+                      fontWeight: 500 
+                    }}>
+                      ⚠️ Found {breachData.length} breach record(s) for this company
+                    </p>
+                    
+                    {/* Table Header */}
+                    <div style={{
+                      display: 'grid',
+                      gridTemplateColumns: '1fr 1fr 1fr 1fr 1fr 1fr 1fr',
+                      gap: '10px',
+                      padding: '15px',
+                      background: 'rgba(255, 107, 107, 0.2)',
+                      borderRadius: '8px 8px 0 0',
+                      border: '1px solid rgba(255, 107, 107, 0.3)',
+                      borderBottom: 'none',
+                      fontWeight: 'bold',
+                      fontSize: '0.9rem'
+                    }}>
+                      <div style={{ color: '#ff6b6b' }}>Breach ID</div>
+                      <div style={{ color: '#00bcd4' }}>Date</div>
+                      <div style={{ color: '#00bcd4' }}>Domain</div>
+                      <div style={{ color: '#00bcd4' }}>Records</div>
+                      <div style={{ color: '#00bcd4' }}>Data Type</div>
+                      <div style={{ color: '#00bcd4' }}>Industry</div>
+                      <div style={{ color: '#00bcd4' }}>Risk</div>
+                    </div>
+                    
+                    {/* Table Rows */}
+                    {breachData.map((breach, index) => (
+                      <div key={index} style={{
+                        display: 'grid',
+                        gridTemplateColumns: '1fr 1fr 1fr 1fr 1fr 1fr 1fr',
+                        gap: '10px',
+                        padding: '15px',
+                        background: index % 2 === 0 ? 'rgba(255, 107, 107, 0.05)' : 'rgba(255, 107, 107, 0.1)',
+                        border: '1px solid rgba(255, 107, 107, 0.3)',
+                        borderTop: 'none',
+                        fontSize: '0.9rem',
+                        lineHeight: '1.3'
+                      }}>
+                        <div style={{ 
+                          color: '#ff6b6b', 
+                          fontWeight: '500',
+                          wordBreak: 'break-word'
+                        }}>
+                          {breach.breach_id}
+                        </div>
+                        <div style={{ wordBreak: 'break-word' }}>
+                          {breach.breach_date}
+                        </div>
+                        <div style={{ wordBreak: 'break-word' }}>
+                          {breach.domain}
+                        </div>
+                        <div style={{ wordBreak: 'break-word' }}>
+                          {breach.exposed_records}
+                        </div>
+                        <div style={{ wordBreak: 'break-word' }}>
+                          {breach.exposed_data}
+                        </div>
+                        <div style={{ wordBreak: 'break-word' }}>
+                          {breach.industry}
+                        </div>
+                        <div style={{ wordBreak: 'break-word' }}>
+                          {breach.password_risk}
+                        </div>
+                      </div>
+                    ))}
+                    
+                    {/* Description Section */}
+                    {breachData.map((breach, index) => (
+                      <div key={`desc-${index}`} style={{
+                        background: 'rgba(0, 0, 0, 0.2)',
+                        border: '1px solid rgba(255, 107, 107, 0.3)',
+                        borderRadius: '0 0 8px 8px',
+                        padding: '15px',
+                        marginBottom: '15px',
+                        fontSize: '0.9rem',
+                        lineHeight: '1.4'
+                      }}>
+                        <div style={{ 
+                          color: '#ffd93d', 
+                          fontWeight: 'bold',
+                          marginBottom: '8px'
+                        }}>
+                          Description for {breach.breach_id}:
+                        </div>
+                        <div style={{ color: '#e0e0e0' }}>
+                          {breach.description}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div style={{ 
+                    color: '#4caf50', 
+                    fontSize: '1rem',
+                    padding: '15px',
+                    background: 'rgba(76, 175, 80, 0.1)',
+                    border: '1px solid rgba(76, 175, 80, 0.3)',
+                    borderRadius: '8px'
+                  }}>
+                    ✅ No breach records found for {companyName}
+                  </div>
+                )}
               </div>
             )}
           </>

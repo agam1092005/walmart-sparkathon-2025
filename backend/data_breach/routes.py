@@ -8,6 +8,8 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from webdriver_manager.chrome import ChromeDriverManager
 import time
+import pandas as pd
+import os
 
 data_breach_bp = Blueprint('data_breach_bp', __name__)
 
@@ -51,6 +53,48 @@ def scrape_xposedornot(domain):
     finally:
         driver.quit()
 
+def search_breach_csv(company_name):
+    """Search for company breaches in the local breach.csv file"""
+    try:
+        # Path to the breach.csv file
+        csv_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), '..', 'datasets', 'breach.csv')
+        
+        # Read the CSV file
+        df = pd.read_csv(csv_path)
+        
+        # Search for company name in the Breach ID column (first column)
+        company_lower = company_name.lower()
+        
+        # Search in Breach ID column only
+        matches = df[df['Breach ID'].str.lower().str.contains(company_lower, na=False)]
+        
+        if matches.empty:
+            return []
+        
+        # Convert to list of dictionaries
+        results = []
+        for _, row in matches.iterrows():
+            result = {
+                "breach_id": row['Breach ID'],
+                "breach_date": row['Breach Date'],
+                "domain": row['Domain'],
+                "exposed_data": row['Exposed Data'],
+                "exposed_records": row['Exposed Records'],
+                "description": row['Description'],
+                "industry": row['Industry'],
+                "password_risk": row['Password Risk'],
+                "searchable": row['Searchable'],
+                "sensitive": row['Sensitive'],
+                "verified": row['Verified']
+            }
+            results.append(result)
+        
+        return results
+        
+    except Exception as e:
+        print(f"Error reading breach.csv: {e}")
+        return []
+
 @data_breach_bp.route('/search', methods=['POST'])
 def search_data_breach():
     data = request.get_json()
@@ -61,6 +105,21 @@ def search_data_breach():
 
     try:
         results = scrape_xposedornot(domain)
+        return jsonify({"results": results})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@data_breach_bp.route('/search_local', methods=['POST'])
+def search_local_breach():
+    """Search for company breaches in the local breach.csv file"""
+    data = request.get_json()
+    company_name = data.get('company_name')
+    
+    if not company_name:
+        return jsonify({"error": "Missing 'company_name' in request body"}), 400
+
+    try:
+        results = search_breach_csv(company_name)
         return jsonify({"results": results})
     except Exception as e:
         return jsonify({"error": str(e)}), 500

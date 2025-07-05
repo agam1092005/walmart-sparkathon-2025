@@ -1,4 +1,4 @@
-import { useContext } from 'react';
+import { useContext, useState } from 'react';
 import { Link } from 'react-router-dom';
 import ScrollReveal from '../components/ScrollReveal';
 import TrueFocus from '../components/TrueFocus';
@@ -8,6 +8,11 @@ import companiesGif from '../assets/companies.gif';
 
 function LandingPage() {
   const { scrollRef, locomotiveInstance } = useContext(LocoScrollContext);
+  const [openFaqIndex, setOpenFaqIndex] = useState(null);
+
+  const handleFaqToggle = (index) => {
+    setOpenFaqIndex(openFaqIndex === index ? null : index);
+  };
 
   return (
     <div>
@@ -94,7 +99,15 @@ function LandingPage() {
             q: 'Is this system secure?',
             a: 'Yes, all communications and model updates are encrypted to ensure maximum security.'
           }].map((faq, idx) => (
-            <details key={idx} style={{ background: 'rgba(255,255,255,0.05)', borderRadius: '8px', marginBottom: '12px', color: '#fff', fontSize: '0.95rem', padding: '12px 18px', border: '1px solid rgba(255,255,255,0.12)' }}>
+            <details 
+              key={idx} 
+              open={openFaqIndex === idx}
+              onClick={(e) => {
+                e.preventDefault();
+                handleFaqToggle(idx);
+              }}
+              style={{ background: 'rgba(255,255,255,0.05)', borderRadius: '8px', marginBottom: '12px', color: '#fff', fontSize: '0.95rem', padding: '12px 18px', border: '1px solid rgba(255,255,255,0.12)' }}
+            >
               <summary style={{ cursor: 'pointer', fontWeight: 600, outline: 'none' }}>{faq.q}</summary>
               <div style={{ marginTop: '8px', color: '#fff', fontSize: '0.92rem', fontWeight: 400 }}>{faq.a}</div>
             </details>
