@@ -8,17 +8,17 @@ const products = [
   },
   {
     id: 2,
-    name: "Samsung Galaxy S23",
+    name: "Samsung Galaxy book",
     price: 699,
     image: "https://m.media-amazon.com/images/I/61Qe0euJJZL._SX679_.jpg",
-    description: "Samsung Galaxy S23 with Snapdragon 8 Gen 2."
+    description: "Samsung Galaxy book"
   },
   {
     id: 3,
-    name: "OnePlus 11",
+    name: "Sony headsets",
     price: 649,
     image: "https://m.media-amazon.com/images/I/71o8Q5XJS5L._SX679_.jpg",
-    description: "OnePlus 11 with Hasselblad camera system."
+    description: "Sony headsets"
   }
 ];
 

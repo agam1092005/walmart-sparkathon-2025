@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 
-function ProductCard({ product }) {
+function ProductCard({ product, onViewDetails }) {
   return (
     <div
       style={{
@@ -29,7 +29,7 @@ function ProductCard({ product }) {
       />
       <h3>{product.name}</h3>
       <p>₹{product.price}</p>
-      <Link to={`/product/${product.id}`} style={{ color: "blue" }}>
+      <Link to={`/product/${product.id}`} style={{ color: "blue" }} onClick={onViewDetails}>
         View Details
       </Link>
     </div>
