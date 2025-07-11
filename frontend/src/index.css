@@ -10,9 +10,6 @@
 }
 
 body {
-  display: flex;
-  justify-content: center;
-  align-items: center;
   min-height: 100vh;
   font-family: 'Poppins', sans-serif;
   background: linear-gradient(135deg, #101820, #1b2a36, #254055);
