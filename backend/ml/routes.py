@@ -1,6 +1,13 @@
 from flask import Blueprint, request, jsonify
 from .models import upload_to_pocketbase, start_background_training, get_company_status, get_user_org_name_from_token
 import requests
+from .client_helper import load_global_preprocessor_from_pocketbase
+import io
+import joblib
+import numpy as np
+import tensorflow as tf
+import os
+import pandas as pd
 
 ml_bp = Blueprint('ml_bp', __name__)
 POCKETBASE_URL = "http://127.0.0.1:8090"
@@ -131,3 +138,82 @@ def get_clients_count():
             "error": "Failed to fetch client count",
             "details": str(e)
         }), 500
+
+@ml_bp.route('/test', methods=['POST'])
+def test_global_model():
+    token = request.cookies.get('pb_token')
+    if not token:
+        auth_header = request.headers.get('Authorization', '')
+        if auth_header.startswith('Bearer '):
+            token = auth_header.split(' ', 1)[1]
+    if not token:
+        return jsonify({'error': 'Authentication required'}), 401
+
+    if 'dataset' not in request.files:
+        return jsonify({'error': 'Missing dataset field'}), 400
+    file = request.files['dataset']
+    df = pd.read_csv(file)
+
+    # Load global preprocessor from PocketBase
+    try:
+        preprocessor = load_global_preprocessor_from_pocketbase(token)
+    except Exception as e:
+        return jsonify({'error': f'Failed to load global preprocessor: {str(e)}'}), 500
+
+    # Preprocess input
+    X = df.copy()
+    y_true = None
+    if 'label_is_fraud' in X.columns:
+        y_true = X['label_is_fraud'].values
+        X = X.drop('label_is_fraud', axis=1)
+    try:
+        X_proc = preprocessor.transform(X)
+    except Exception as e:
+        return jsonify({'error': f'Preprocessing failed: {str(e)}'}), 400
+
+    # Download global model from PocketBase
+    import requests
+    POCKETBASE_URL = "http://127.0.0.1:8090"
+    headers = {"Authorization": f"Bearer {token}"}
+    url = f"{POCKETBASE_URL}/api/collections/global/records"
+    resp = requests.get(url, headers=headers)
+    if not resp.ok:
+        return jsonify({'error': 'Failed to fetch global model record'}), 500
+    items = resp.json().get('items', [])
+    if not items or not items[0].get('global_model'):
+        return jsonify({'error': 'No global model found in PocketBase'}), 404
+    record = items[0]
+    collection_id = record.get('collectionId', 'global')
+    record_id = record['id']
+    filename = record['global_model']
+    file_url = f"{POCKETBASE_URL}/api/files/{collection_id}/{record_id}/{filename}"
+    file_resp = requests.get(file_url, headers=headers)
+    if not file_resp.ok:
+        return jsonify({'error': 'Failed to download global model'}), 500
+    # Save model temporarily
+    tmp_model_path = 'tmp_global_model.h5'
+    with open(tmp_model_path, 'wb') as f:
+        f.write(file_resp.content)
+    try:
+        model = tf.keras.models.load_model(tmp_model_path)
+    except Exception as e:
+        os.remove(tmp_model_path)
+        return jsonify({'error': f'Failed to load model: {str(e)}'}), 500
+    os.remove(tmp_model_path)
+
+    # Predict
+    preds = model.predict(X_proc)
+    preds_bin = (preds > 0.5).astype(int).flatten()
+    total = len(preds_bin)
+    frauds = int(np.sum(preds_bin))
+    percent_fraud = (frauds / total) * 100 if total > 0 else 0
+
+    result = {
+        'total': total,
+        'frauds': frauds,
+        'percent_fraud': percent_fraud
+    }
+    if y_true is not None:
+        accuracy = float(np.mean(preds_bin == y_true))
+        result['accuracy'] = accuracy
+    return jsonify(result), 200

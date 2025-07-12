@@ -7,6 +7,7 @@ import Dashboard from './pages/Dashboard';
 import ProtectedRoute from './components/ProtectedRoute';
 import RootRedirect from './components/RootRedirect';
 import AuthRedirect from './components/AuthRedirect';
+import Test from './pages/Test';
 import 'locomotive-scroll/dist/locomotive-scroll.css';
 
 export const LocoScrollContext = createContext({ scrollRef: null, locomotiveInstance: null });
@@ -59,6 +60,7 @@ function App() {
           <Route path="/signup" element={<AuthRedirect><SignUpPage /></AuthRedirect>} />
           <Route path="/upload" element={<ProtectedRoute><UploadPage /></ProtectedRoute>} />
           <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+          <Route path="/test" element={<ProtectedRoute><Test /></ProtectedRoute>} />
         </Routes>
       </ScrollProvider>
     </Router>

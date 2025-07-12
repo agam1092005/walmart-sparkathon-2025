@@ -93,14 +93,6 @@ function Payment() {
       }
     }
 
-    // 3. Rapid input changes: >5 changes in last 30 seconds
-    const thirtySecondsAgo = currentTime - 30 * 1000;
-    const changesLast30s = inputChangeTimes.current.filter(ts => ts > thirtySecondsAgo).length;
-    if (changesLast30s > 5) {
-      suspicious = true;
-      reasons.push("Too many card detail changes in a short time");
-    }
-
     setIsPaid(true);
     setBotDetected(suspicious);
     setWarning(suspicious ? `Bot activity detected: ${reasons.join(", ")}` : "");
