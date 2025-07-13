@@ -71,14 +71,14 @@ Together, this creates a robust, privacy-respecting and scalable fraud detection
 
 ## ⚙️ Technical Stack
 
-| Component              | Tech                                      |
-|------------------------|-------------------------------------------|
-| Frontend Dashboard     | React.js                                  |
-| Backend API            | Flask                                     |
-| Local Model Training   | TensorFlow + Differential Privacy         |
-| Federated Learning     | Flower (Python)                           |
-| Model Encryption       | Fernet (AES-based)                        |
-| Storage / Metadata     | PocketBase                                |
+| Component            | Tech                              |
+| -------------------- | --------------------------------- |
+| Frontend Dashboard   | React.js                          |
+| Backend API          | Flask                             |
+| Local Model Training | TensorFlow + Differential Privacy |
+| Federated Learning   | Flower (Python)                   |
+| Model Encryption     | Fernet (AES-based)                |
+| Storage / Metadata   | PocketBase                        |
 
 ---
 
@@ -98,8 +98,64 @@ Together, this creates a robust, privacy-respecting and scalable fraud detection
 > This system proves that multiple organizations can collaborate securely — without giving up control of their data.
 
 It’s:
-- 🔐 Privacy-first  
-- 🧠 AI-driven  
-- 🔄 Collaborative  
-- 🚀 Real-time ready  
+- 🔐 Privacy-first
+- 🧠 AI-driven
+- 🔄 Collaborative
+- 🚀 Real-time ready
 - ☁️ Lightweight and deployable anywhere
+
+---
+
+## 🚀 How to Run This Project
+
+Follow these steps to get the platform running locally:
+
+---
+
+### 1. Setup PocketBase (Coordination Backend)
+
+- Download the latest PocketBase release for your OS from the [official docs](https://pocketbase.io/docs/).
+- Extract the archive and run the server:
+  ```bash
+  ./pocketbase serve
+  ```
+- On first run, follow the instructions to create a superuser account.
+- PocketBase will be available at [http://127.0.0.1:8090](http://127.0.0.1:8090).
+
+---
+
+### 2. Setup Backend (API & Federated Server)
+
+- Open a terminal in the `backend/` directory.
+- Create and activate a virtual environment:
+  ```bash
+  python3 -m venv venv
+  source venv/bin/activate
+  ```
+- Install dependencies:
+  ```bash
+  pip install -r requirements.txt
+  ```
+- Run the backend server:
+  ```bash
+  python app.py
+  ```
+
+---
+
+### 3. Setup Frontend (Dashboard UI)
+
+- Open a terminal in the `frontend/` directory.
+- Install dependencies:
+  ```bash
+  npm install
+  ```
+- Start the development server:
+  ```bash
+  npm run dev
+  ```
+- The app will be available at the URL shown in your terminal (typically [http://localhost:5173](http://localhost:5173)).
+
+---
+
+For more details on PocketBase setup and features, see the [PocketBase documentation](https://pocketbase.io/docs/).
